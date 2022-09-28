@@ -1,0 +1,46 @@
+version: "3.3"
+services:
+  db:
+    image: postgres:12
+    volumes:
+      - app-db-data:/var/lib/postgresql/data/pgdata
+    env_file:
+      - .env
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdata
+
+  pgadmin:
+    image: dpage/pgadmin4
+    networks:
+      - default
+    depends_on:
+      - db
+    env_file:
+      - .env
+    ports:
+      - "5050:5050"
+
+  backend:
+    image: 'backend:${TAG-latest}'
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      - SERVER_NAME=localhost
+      - SERVER_HOST=https://localhost
+      - PROJECT_NAME=sample
+      # Allow explicit env var override for tests
+    command: sh -c "python app/backend_pre_start.py && alembic upgrade head && python app/initial_data.py && uvicorn app.main:app --host 0.0.0.0"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app
+    build:
+      context: ./backend
+      dockerfile: backend.dockerfile
+      args:
+        INSTALL_DEV: ${INSTALL_DEV-false}
+
+volumes:
+  app-db-data:
